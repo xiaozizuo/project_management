@@ -1,0 +1,297 @@
+{
+  "projects": [
+    {
+      "id": "proj_oa_2026",
+      "projectCode": "P-2026-0001",
+      "projectName": "档案系统升级",
+      "projectMeasure": "统一档案流程，完成电子化改造",
+      "ownerUnit": "信息中心",
+      "ownerDept": "科信部",
+      "assistUnit": "综合管理部",
+      "assistDept": "办公室",
+      "startDate": "2026-01-10",
+      "targetDate": "2026-09-30",
+      "ownerPerson": "张敏",
+      "tasks": [
+        {
+          "id": "t_oa_01",
+          "title": "需求调研与方案评审",
+          "desc": "完成业务访谈与范围确认",
+          "mainNode": "计划",
+          "expectedStartDate": "2026-01-10",
+          "expectedEndDate": "2026-02-05",
+          "cycleDays": 27,
+          "progress": 100,
+          "actualDoneDate": "2026-02-03",
+          "deliverable": "需求规格说明书V1",
+          "createdAt": "2026-01-10T09:00:00.000Z"
+        },
+        {
+          "id": "t_oa_02",
+          "title": "立项与预算审批",
+          "desc": "提交立项资料并通过评审",
+          "mainNode": "立项",
+          "expectedStartDate": "2026-02-06",
+          "expectedEndDate": "2026-02-28",
+          "cycleDays": 23,
+          "progress": 100,
+          "actualDoneDate": "2026-02-26",
+          "deliverable": "立项批复文件",
+          "createdAt": "2026-02-06T09:00:00.000Z"
+        },
+        {
+          "id": "t_oa_03",
+          "title": "硬件与存储采购",
+          "desc": "服务器、存储阵列采购到货",
+          "mainNode": "采购",
+          "expectedStartDate": "2026-03-01",
+          "expectedEndDate": "2026-04-10",
+          "cycleDays": 41,
+          "progress": 90,
+          "actualDoneDate": "",
+          "deliverable": "采购合同与到货清单",
+          "createdAt": "2026-03-01T09:00:00.000Z"
+        },
+        {
+          "id": "t_oa_04",
+          "title": "核心模块实施",
+          "desc": "档案入库、检索、借阅模块开发",
+          "mainNode": "实施",
+          "expectedStartDate": "2026-04-11",
+          "expectedEndDate": "2026-07-20",
+          "cycleDays": 101,
+          "progress": 62,
+          "actualDoneDate": "",
+          "deliverable": "版本包V1.8",
+          "createdAt": "2026-04-11T09:00:00.000Z"
+        },
+        {
+          "id": "t_oa_05",
+          "title": "上线试运行",
+          "desc": "双轨运行并处理问题单",
+          "mainNode": "上线试运行",
+          "expectedStartDate": "2026-07-21",
+          "expectedEndDate": "2026-08-31",
+          "cycleDays": 42,
+          "progress": 20,
+          "actualDoneDate": "",
+          "deliverable": "试运行日报",
+          "createdAt": "2026-07-21T09:00:00.000Z"
+        },
+        {
+          "id": "t_oa_06",
+          "title": "项目验收",
+          "desc": "组织终验与材料归档",
+          "mainNode": "验收",
+          "expectedStartDate": "2026-09-01",
+          "expectedEndDate": "2026-09-30",
+          "cycleDays": 30,
+          "progress": 0,
+          "actualDoneDate": "",
+          "deliverable": "验收报告",
+          "createdAt": "2026-09-01T09:00:00.000Z"
+        }
+      ],
+      "snapshots": [
+        {
+          "month": "2026-03",
+          "updatedAt": "2026-03-31T10:00:00.000Z",
+          "overallProgress": 46,
+          "taskCount": 6,
+          "doneCount": 2,
+          "delayedCount": 0
+        },
+        {
+          "month": "2026-04",
+          "updatedAt": "2026-04-30T10:00:00.000Z",
+          "overallProgress": 55,
+          "taskCount": 6,
+          "doneCount": 2,
+          "delayedCount": 1
+        }
+      ],
+      "createdAt": "2026-01-10T09:00:00.000Z",
+      "updatedAt": "2026-04-30T10:00:00.000Z"
+    },
+    {
+      "id": "proj_net_2026",
+      "projectCode": "P-2026-0002",
+      "projectName": "园区网络改造",
+      "projectMeasure": "核心交换与无线覆盖升级",
+      "ownerUnit": "运维中心",
+      "ownerDept": "网络部",
+      "assistUnit": "后勤保障部",
+      "assistDept": "设备科",
+      "startDate": "2026-02-01",
+      "targetDate": "2026-08-15",
+      "ownerPerson": "李强",
+      "tasks": [
+        {
+          "id": "t_net_01",
+          "title": "现网评估",
+          "desc": "链路质量测试与瓶颈识别",
+          "mainNode": "计划",
+          "expectedStartDate": "2026-02-01",
+          "expectedEndDate": "2026-02-20",
+          "cycleDays": 20,
+          "progress": 100,
+          "actualDoneDate": "2026-02-18",
+          "deliverable": "评估报告",
+          "createdAt": "2026-02-01T08:00:00.000Z"
+        },
+        {
+          "id": "t_net_02",
+          "title": "设备采购",
+          "desc": "交换机与AP采购",
+          "mainNode": "采购",
+          "expectedStartDate": "2026-02-21",
+          "expectedEndDate": "2026-03-25",
+          "cycleDays": 33,
+          "progress": 100,
+          "actualDoneDate": "2026-03-22",
+          "deliverable": "采购合同",
+          "createdAt": "2026-02-21T08:00:00.000Z"
+        },
+        {
+          "id": "t_net_03",
+          "title": "核心机房实施",
+          "desc": "核心设备替换与割接",
+          "mainNode": "实施",
+          "expectedStartDate": "2026-03-26",
+          "expectedEndDate": "2026-05-30",
+          "cycleDays": 66,
+          "progress": 78,
+          "actualDoneDate": "",
+          "deliverable": "割接记录",
+          "createdAt": "2026-03-26T08:00:00.000Z"
+        },
+        {
+          "id": "t_net_04",
+          "title": "办公区无线优化",
+          "desc": "完成热点补盲和参数优化",
+          "mainNode": "上线试运行",
+          "expectedStartDate": "2026-06-01",
+          "expectedEndDate": "2026-07-25",
+          "cycleDays": 55,
+          "progress": 35,
+          "actualDoneDate": "",
+          "deliverable": "无线覆盖热力图",
+          "createdAt": "2026-06-01T08:00:00.000Z"
+        },
+        {
+          "id": "t_net_05",
+          "title": "验收与交接",
+          "desc": "稳定性验证与文档交接",
+          "mainNode": "验收",
+          "expectedStartDate": "2026-07-26",
+          "expectedEndDate": "2026-08-15",
+          "cycleDays": 21,
+          "progress": 0,
+          "actualDoneDate": "",
+          "deliverable": "验收清单",
+          "createdAt": "2026-07-26T08:00:00.000Z"
+        }
+      ],
+      "snapshots": [
+        {
+          "month": "2026-03",
+          "updatedAt": "2026-03-31T10:00:00.000Z",
+          "overallProgress": 52,
+          "taskCount": 5,
+          "doneCount": 2,
+          "delayedCount": 0
+        },
+        {
+          "month": "2026-04",
+          "updatedAt": "2026-04-30T10:00:00.000Z",
+          "overallProgress": 60,
+          "taskCount": 5,
+          "doneCount": 2,
+          "delayedCount": 0
+        }
+      ],
+      "createdAt": "2026-02-01T08:00:00.000Z",
+      "updatedAt": "2026-04-30T10:00:00.000Z"
+    },
+    {
+      "id": "proj_ai_2026",
+      "projectCode": "P-2026-0003",
+      "projectName": "智能客服知识库",
+      "projectMeasure": "构建知识库与问答流程",
+      "ownerUnit": "数字化办公室",
+      "ownerDept": "应用研发部",
+      "assistUnit": "客服中心",
+      "assistDept": "运营支持组",
+      "startDate": "2026-03-05",
+      "targetDate": "2026-12-20",
+      "ownerPerson": "王琳",
+      "tasks": [
+        {
+          "id": "t_ai_01",
+          "title": "语料整理",
+          "desc": "清洗历史工单并建标签体系",
+          "mainNode": "计划",
+          "expectedStartDate": "2026-03-05",
+          "expectedEndDate": "2026-04-05",
+          "cycleDays": 32,
+          "progress": 100,
+          "actualDoneDate": "2026-04-02",
+          "deliverable": "语料集V1",
+          "createdAt": "2026-03-05T07:30:00.000Z"
+        },
+        {
+          "id": "t_ai_02",
+          "title": "知识图谱建模",
+          "desc": "主题、意图、实体关系建模",
+          "mainNode": "实施",
+          "expectedStartDate": "2026-04-06",
+          "expectedEndDate": "2026-06-15",
+          "cycleDays": 71,
+          "progress": 64,
+          "actualDoneDate": "",
+          "deliverable": "图谱模型V1",
+          "createdAt": "2026-04-06T07:30:00.000Z"
+        },
+        {
+          "id": "t_ai_03",
+          "title": "问答引擎联调",
+          "desc": "接入业务系统并压测",
+          "mainNode": "上线试运行",
+          "expectedStartDate": "2026-06-16",
+          "expectedEndDate": "2026-09-10",
+          "cycleDays": 87,
+          "progress": 28,
+          "actualDoneDate": "",
+          "deliverable": "联调报告",
+          "createdAt": "2026-06-16T07:30:00.000Z"
+        },
+        {
+          "id": "t_ai_04",
+          "title": "试运行与验收",
+          "desc": "试运行一个季度并组织验收",
+          "mainNode": "验收",
+          "expectedStartDate": "2026-09-11",
+          "expectedEndDate": "2026-12-20",
+          "cycleDays": 101,
+          "progress": 0,
+          "actualDoneDate": "",
+          "deliverable": "验收材料",
+          "createdAt": "2026-09-11T07:30:00.000Z"
+        }
+      ],
+      "snapshots": [
+        {
+          "month": "2026-04",
+          "updatedAt": "2026-04-30T10:00:00.000Z",
+          "overallProgress": 40,
+          "taskCount": 4,
+          "doneCount": 1,
+          "delayedCount": 0
+        }
+      ],
+      "createdAt": "2026-03-05T07:30:00.000Z",
+      "updatedAt": "2026-04-30T10:00:00.000Z"
+    }
+  ],
+  "activeProjectId": "proj_oa_2026"
+}

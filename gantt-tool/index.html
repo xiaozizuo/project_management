@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>项目月度跟踪与甘特图</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>项目月度跟踪与甘特图工具</h1>
+      <div class="actions">
+        <button id="btnExport" class="ghost">导出数据</button>
+        <label class="file-import">
+          导入数据
+          <input id="fileImport" type="file" accept="application/json" />
+        </label>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel projects-panel">
+        <div class="panel-title-row">
+          <h2>项目列表</h2>
+          <button id="btnNewProject">新建项目</button>
+        </div>
+        <ul id="projectList" class="project-list"></ul>
+      </aside>
+
+      <section class="panel content-panel">
+        <div id="emptyState" class="empty-state">请选择或创建一个项目</div>
+
+        <div id="projectContent" class="hidden">
+          <section class="block">
+            <div class="panel-title-row">
+              <h2>文本抽取</h2>
+              <button id="btnExtract">从文本提取</button>
+            </div>
+            <textarea id="textInput" rows="5" placeholder="粘贴项目描述，例如：任务名称、责任单位、责任部门、立项日期、目标验收日期、责任人等"></textarea>
+          </section>
+
+          <section class="block">
+            <h2>项目基础信息</h2>
+            <div class="grid grid-3">
+              <label>项目编号<input id="projectCode" /></label>
+              <label>任务名称<input id="projectName" required /></label>
+              <label>工作措施<input id="projectMeasure" /></label>
+              <label>责任单位<input id="ownerUnit" /></label>
+              <label>责任部门<input id="ownerDept" /></label>
+              <label>协办单位<input id="assistUnit" /></label>
+              <label>协办部门<input id="assistDept" /></label>
+              <label>立项日期<input id="startDate" type="date" /></label>
+              <label>目标验收日期<input id="targetDate" type="date" /></label>
+              <label>科信部责任人<input id="ownerPerson" /></label>
+            </div>
+            <div class="summary-row">
+              <span>整体执行百分比（自动）：</span>
+              <strong id="overallProgress">0%</strong>
+            </div>
+          </section>
+
+          <section class="block">
+            <div class="panel-title-row">
+              <h2>工作计划明细（按月更新）</h2>
+              <button id="btnAddTask">新增明细</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>序号</th>
+                    <th>工作计划明细</th>
+                    <th>说明</th>
+                    <th>所属主节点</th>
+                    <th>预计开始日期</th>
+                    <th>预计完成日期</th>
+                    <th>周期（天）</th>
+                    <th>执行百分比</th>
+                    <th>实际完成日期</th>
+                    <th>交付物</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="taskTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="block">
+            <h2>项目甘特图</h2>
+            <div class="gantt-toolbar">
+              <label>时间粒度
+                <select id="ganttScale">
+                  <option value="month" selected>月视图</option>
+                  <option value="year">年视图</option>
+                </select>
+              </label>
+              <label>显示月份<input id="ganttMonthFilter" type="month" /></label>
+            </div>
+            <div id="ganttContainer" class="gantt-container"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
