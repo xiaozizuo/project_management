@@ -1,4 +1,5 @@
 const STORAGE_KEY = "gantt_tool_data_v1";
+const API_BASE = "/api";
 
 const NODE_OPTIONS = ["计划", "立项", "采购", "实施", "上线试运行", "验收"];
 
@@ -12,6 +13,14 @@ const dom = {
   btnAddTask: document.getElementById("btnAddTask"),
   btnExport: document.getElementById("btnExport"),
   fileImport: document.getElementById("fileImport"),
+  backendStatus: document.getElementById("backendStatus"),
+  summaryMonthFilter: document.getElementById("summaryMonthFilter"),
+  summaryDeptFilter: document.getElementById("summaryDeptFilter"),
+  summaryOwnerFilter: document.getElementById("summaryOwnerFilter"),
+  btnSummaryReset: document.getElementById("btnSummaryReset"),
+  summaryCards: document.getElementById("summaryCards"),
+  deptSummaryBody: document.getElementById("deptSummaryBody"),
+  delayTaskList: document.getElementById("delayTaskList"),
   taskTableBody: document.getElementById("taskTableBody"),
   overallProgress: document.getElementById("overallProgress"),
   ganttContainer: document.getElementById("ganttContainer"),
@@ -34,36 +43,112 @@ const dom = {
 const state = {
   projects: [],
   activeProjectId: null,
+  summaryFilters: {
+    month: "",
+    dept: "",
+    owner: "",
+  },
+};
+
+const runtime = {
+  storageMode: "local",
+  saveQueue: Promise.resolve(),
+  storageNote: "",
 };
 
 function uid() {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function load() {
+function setBackendStatus() {
+  if (!dom.backendStatus) return;
+  if (runtime.storageMode === "api") {
+    dom.backendStatus.textContent = "存储模式：后端 SQLite";
+    dom.backendStatus.title = "当前数据写入 SQLite";
+    return;
+  }
+  const suffix = runtime.storageNote ? `（${runtime.storageNote}）` : "";
+  dom.backendStatus.textContent = `存储模式：本地${suffix}`;
+  dom.backendStatus.title = "当前数据写入浏览器本地存储";
+}
+
+function applyLoadedState(payload) {
+  if (!payload || !Array.isArray(payload.projects)) return;
+  state.projects = payload.projects.map((p) => ({
+    ...p,
+    tasks: Array.isArray(p.tasks) ? p.tasks : [],
+    snapshots: Array.isArray(p.snapshots) ? p.snapshots : [],
+  }));
+  state.activeProjectId = payload.activeProjectId || payload.projects[0]?.id || null;
+}
+
+function loadFromLocal() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return;
-    }
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed.projects)) {
-      state.projects = parsed.projects;
-      state.activeProjectId = parsed.activeProjectId || parsed.projects[0]?.id || null;
-    }
+    if (!raw) return;
+    applyLoadedState(JSON.parse(raw));
   } catch (err) {
-    console.error("load failed", err);
+    console.error("load local failed", err);
   }
 }
 
+async function loadFromApiIfAvailable() {
+  try {
+    if (window.location.protocol === "file:") {
+      runtime.storageMode = "local";
+      runtime.storageNote = "请通过 http://127.0.0.1:8080 打开";
+      return;
+    }
+
+    const health = await fetch(`${API_BASE}/health`, { cache: "no-store" });
+    if (!health.ok) {
+      runtime.storageMode = "local";
+      runtime.storageNote = "后端未响应";
+      return;
+    }
+
+    const resp = await fetch(`${API_BASE}/state`, { cache: "no-store" });
+    if (!resp.ok) {
+      runtime.storageMode = "local";
+      runtime.storageNote = "后端状态读取失败";
+      return;
+    }
+    const payload = await resp.json();
+    applyLoadedState(payload);
+    runtime.storageMode = "api";
+    runtime.storageNote = "";
+  } catch (err) {
+    runtime.storageMode = "local";
+    runtime.storageNote = "后端不可达";
+  }
+}
+
+function currentStatePayload() {
+  return {
+    projects: state.projects,
+    activeProjectId: state.activeProjectId,
+  };
+}
+
+function queueApiPersist() {
+  if (runtime.storageMode !== "api") return;
+  const payload = currentStatePayload();
+  runtime.saveQueue = runtime.saveQueue
+    .then(() =>
+      fetch(`${API_BASE}/state`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    )
+    .catch((err) => {
+      console.error("save api failed", err);
+    });
+}
+
 function persist() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      projects: state.projects,
-      activeProjectId: state.activeProjectId,
-    }),
-  );
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(currentStatePayload()));
+  queueApiPersist();
 }
 
 function getActiveProject() {
@@ -173,6 +258,136 @@ function isDelayed(task) {
   const today = new Date();
   const due = toDate(task.expectedEndDate);
   return due ? due < new Date(today.toDateString()) : false;
+}
+
+function getProjectStatus(project) {
+  const tasks = project.tasks || [];
+  if (!tasks.length) return "未开始";
+  if (tasks.every((t) => !!t.actualDoneDate)) return "已完成";
+  if (tasks.some((t) => isDelayed(t))) return "延期";
+  return "进行中";
+}
+
+function taskOverlapMonth(task, month) {
+  if (!month) return true;
+  if (!task.expectedStartDate || !task.expectedEndDate) return false;
+  return monthKey(task.expectedStartDate) <= month && monthKey(task.expectedEndDate) >= month;
+}
+
+function projectMatchMonth(project, month) {
+  if (!month) return true;
+  const tasks = project.tasks || [];
+  if (tasks.some((t) => taskOverlapMonth(t, month))) return true;
+  if (project.startDate && project.targetDate) {
+    return monthKey(project.startDate) <= month && monthKey(project.targetDate) >= month;
+  }
+  return false;
+}
+
+function renderSummaryFilterOptions() {
+  const deptSet = new Set();
+  const ownerSet = new Set();
+  state.projects.forEach((p) => {
+    if (p.ownerDept) deptSet.add(p.ownerDept);
+    if (p.ownerPerson) ownerSet.add(p.ownerPerson);
+  });
+
+  const depts = Array.from(deptSet).sort((a, b) => a.localeCompare(b, "zh-CN"));
+  const owners = Array.from(ownerSet).sort((a, b) => a.localeCompare(b, "zh-CN"));
+
+  dom.summaryMonthFilter.value = state.summaryFilters.month || "";
+
+  const deptCurrent = state.summaryFilters.dept;
+  dom.summaryDeptFilter.innerHTML =
+    '<option value="">全部部门</option>' +
+    depts.map((dept) => `<option value="${escapeHtml(dept)}">${escapeHtml(dept)}</option>`).join("");
+  if (depts.includes(deptCurrent)) {
+    dom.summaryDeptFilter.value = deptCurrent;
+  } else {
+    state.summaryFilters.dept = "";
+  }
+
+  const ownerCurrent = state.summaryFilters.owner;
+  dom.summaryOwnerFilter.innerHTML =
+    '<option value="">全部负责人</option>' +
+    owners.map((owner) => `<option value="${escapeHtml(owner)}">${escapeHtml(owner)}</option>`).join("");
+  if (owners.includes(ownerCurrent)) {
+    dom.summaryOwnerFilter.value = ownerCurrent;
+  } else {
+    state.summaryFilters.owner = "";
+  }
+}
+
+function getSummaryFilteredProjects() {
+  const { month, dept, owner } = state.summaryFilters;
+  return state.projects.filter((p) => {
+    if (dept && p.ownerDept !== dept) return false;
+    if (owner && p.ownerPerson !== owner) return false;
+    if (!projectMatchMonth(p, month)) return false;
+    return true;
+  });
+}
+
+function renderSummaryBoard() {
+  const projects = getSummaryFilteredProjects();
+  const allTasks = projects.flatMap((p) => p.tasks || []);
+  const doneProjects = projects.filter((p) => getProjectStatus(p) === "已完成").length;
+  const delayedProjects = projects.filter((p) => getProjectStatus(p) === "延期").length;
+  const inProgressProjects = projects.filter((p) => getProjectStatus(p) === "进行中").length;
+  const delayedTasks = allTasks.filter((t) => isDelayed(t));
+  const avgProgress = projects.length
+    ? Math.round(projects.reduce((sum, p) => sum + calcOverallProgress(p.tasks || []), 0) / projects.length)
+    : 0;
+
+  dom.summaryCards.innerHTML = [
+    { label: "项目总数", value: projects.length },
+    { label: "进行中项目", value: inProgressProjects },
+    { label: "已完成项目", value: doneProjects },
+    { label: "延期项目", value: delayedProjects },
+    { label: "任务总数", value: allTasks.length },
+    { label: "平均进度", value: `${avgProgress}%` },
+  ]
+    .map(
+      (x) =>
+        `<div class="metric-card"><div class="metric-label">${x.label}</div><div class="metric-value">${x.value}</div></div>`,
+    )
+    .join("");
+
+  const deptMap = new Map();
+  projects.forEach((p) => {
+    const key = p.ownerDept || "未填写";
+    const prev = deptMap.get(key) || { projectCount: 0, progressSum: 0, delayedTaskCount: 0 };
+    prev.projectCount += 1;
+    prev.progressSum += calcOverallProgress(p.tasks || []);
+    prev.delayedTaskCount += (p.tasks || []).filter((t) => isDelayed(t)).length;
+    deptMap.set(key, prev);
+  });
+
+  const deptRows = Array.from(deptMap.entries())
+    .sort((a, b) => b[1].projectCount - a[1].projectCount)
+    .map(([dept, val]) => {
+      const avg = val.projectCount ? Math.round(val.progressSum / val.projectCount) : 0;
+      return `<tr><td>${escapeHtml(dept)}</td><td>${val.projectCount}</td><td>${avg}%</td><td>${val.delayedTaskCount}</td></tr>`;
+    })
+    .join("");
+  dom.deptSummaryBody.innerHTML = deptRows || '<tr><td colspan="4">暂无数据</td></tr>';
+
+  const topDelay = delayedTasks
+    .map((t) => ({
+      title: t.title || "未命名任务",
+      due: t.expectedEndDate || "",
+      delayDays: t.expectedEndDate
+        ? Math.max(0, Math.round((atStartOfDay(new Date()) - atStartOfDay(toDate(t.expectedEndDate))) / 86400000))
+        : 0,
+    }))
+    .sort((a, b) => b.delayDays - a.delayDays)
+    .slice(0, 10);
+
+  dom.delayTaskList.innerHTML = topDelay.length
+    ? topDelay
+        .map((x) => `<li>${escapeHtml(x.title)}（截至 ${x.due || "未知"}，延期 ${x.delayDays} 天）</li>`)
+        .join("")
+    : "<li>暂无延期任务</li>";
 }
 
 function renderProjectList() {
@@ -495,6 +710,9 @@ function renderActiveProject() {
 }
 
 function renderAll() {
+  setBackendStatus();
+  renderSummaryFilterOptions();
+  renderSummaryBoard();
   renderProjectList();
   renderActiveProject();
 }
@@ -600,12 +818,39 @@ function bindEvents() {
     renderGanttToolbarState();
     renderGantt(p);
   });
+
+  dom.summaryMonthFilter.addEventListener("change", () => {
+    state.summaryFilters.month = dom.summaryMonthFilter.value || "";
+    renderAll();
+  });
+
+  dom.summaryDeptFilter.addEventListener("change", () => {
+    state.summaryFilters.dept = dom.summaryDeptFilter.value || "";
+    renderAll();
+  });
+
+  dom.summaryOwnerFilter.addEventListener("change", () => {
+    state.summaryFilters.owner = dom.summaryOwnerFilter.value || "";
+    renderAll();
+  });
+
+  dom.btnSummaryReset.addEventListener("click", () => {
+    state.summaryFilters.month = "";
+    state.summaryFilters.dept = "";
+    state.summaryFilters.owner = "";
+    renderAll();
+  });
 }
 
-load();
-bindEvents();
-if (!state.projects.length) {
-  addProject();
-} else {
-  renderAll();
+async function initApp() {
+  loadFromLocal();
+  await loadFromApiIfAvailable();
+  bindEvents();
+  if (!state.projects.length) {
+    addProject();
+  } else {
+    renderAll();
+  }
 }
+
+initApp();

@@ -1,0 +1,26 @@
+# Database files
+backend/data.db
+backend/*.db
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*.bak
+*.orig
+*~
+
+# OS / editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/*.log

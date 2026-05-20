@@ -10,6 +10,7 @@
     <header class="app-header">
       <h1>项目月度跟踪与甘特图工具</h1>
       <div class="actions">
+        <span id="backendStatus" class="backend-status">存储模式：本地</span>
         <button id="btnExport" class="ghost">导出数据</button>
         <label class="file-import">
           导入数据
@@ -28,6 +29,49 @@
       </aside>
 
       <section class="panel content-panel">
+        <section class="block" id="summaryBoard">
+          <h2>多项目汇总看板</h2>
+          <div class="summary-filters">
+            <label>按月份
+              <input id="summaryMonthFilter" type="month" />
+            </label>
+            <label>按部门
+              <select id="summaryDeptFilter">
+                <option value="">全部部门</option>
+              </select>
+            </label>
+            <label>按负责人
+              <select id="summaryOwnerFilter">
+                <option value="">全部负责人</option>
+              </select>
+            </label>
+            <button id="btnSummaryReset" class="ghost">重置筛选</button>
+          </div>
+          <div id="summaryCards" class="summary-cards"></div>
+          <div class="summary-grid">
+            <div class="summary-box">
+              <h3>按责任部门汇总</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>责任部门</th>
+                      <th>项目数</th>
+                      <th>平均进度</th>
+                      <th>延期任务</th>
+                    </tr>
+                  </thead>
+                  <tbody id="deptSummaryBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="summary-box">
+              <h3>延期任务 TOP 10</h3>
+              <ul id="delayTaskList" class="delay-list"></ul>
+            </div>
+          </div>
+        </section>
+
         <div id="emptyState" class="empty-state">请选择或创建一个项目</div>
 
         <div id="projectContent" class="hidden">
