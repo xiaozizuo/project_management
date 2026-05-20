@@ -13,13 +13,13 @@
         <span id="backendStatus" class="backend-status">存储模式：本地</span>
         <button id="btnExport" class="ghost">导出数据</button>
         <label class="file-import">
-          导入数据
-          <input id="fileImport" type="file" accept="application/json" />
+          导入数据/文本
+          <input id="fileImport" type="file" accept=".json,.txt,application/json,text/plain" />
         </label>
       </div>
     </header>
 
-    <main class="layout">
+    <main id="mainLayout" class="layout">
       <aside class="panel projects-panel">
         <div class="panel-title-row">
           <h2>项目列表</h2>
@@ -28,46 +28,55 @@
         <ul id="projectList" class="project-list"></ul>
       </aside>
 
+      <div id="sidebarResizer" class="sidebar-resizer" title="拖动调整项目列表宽度" aria-label="拖动调整项目列表宽度" role="separator"></div>
+
       <section class="panel content-panel">
-        <section class="block" id="summaryBoard">
-          <h2>多项目汇总看板</h2>
-          <div class="summary-filters">
-            <label>按月份
-              <input id="summaryMonthFilter" type="month" />
-            </label>
-            <label>按部门
-              <select id="summaryDeptFilter">
-                <option value="">全部部门</option>
-              </select>
-            </label>
-            <label>按负责人
-              <select id="summaryOwnerFilter">
-                <option value="">全部负责人</option>
-              </select>
-            </label>
-            <button id="btnSummaryReset" class="ghost">重置筛选</button>
+        <section class="block summary-board collapsed" id="summaryBoard">
+          <div class="summary-head">
+            <h2>多项目汇总看板</h2>
+            <button id="btnSummaryToggle" class="ghost" type="button">展开</button>
           </div>
-          <div id="summaryCards" class="summary-cards"></div>
-          <div class="summary-grid">
-            <div class="summary-box">
-              <h3>按责任部门汇总</h3>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>责任部门</th>
-                      <th>项目数</th>
-                      <th>平均进度</th>
-                      <th>延期任务</th>
-                    </tr>
-                  </thead>
-                  <tbody id="deptSummaryBody"></tbody>
-                </table>
-              </div>
+          <div id="summaryCompact" class="summary-compact"></div>
+          <div id="summaryDetails" class="summary-details">
+            <div class="summary-filters">
+              <label>按月份
+                <input id="summaryMonthFilter" type="month" />
+              </label>
+              <label>按部门
+                <select id="summaryDeptFilter">
+                  <option value="">全部部门</option>
+                </select>
+              </label>
+              <label>按负责人
+                <select id="summaryOwnerFilter">
+                  <option value="">全部负责人</option>
+                </select>
+              </label>
+              <button id="btnSummaryReset" class="ghost">重置筛选</button>
             </div>
-            <div class="summary-box">
-              <h3>延期任务 TOP 10</h3>
-              <ul id="delayTaskList" class="delay-list"></ul>
+            <div id="summaryCards" class="summary-cards"></div>
+            <div id="summaryGrid" class="summary-grid">
+              <div class="summary-box">
+                <h3>按责任部门汇总</h3>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>责任部门</th>
+                        <th>项目数</th>
+                        <th>平均进度</th>
+                        <th>延期任务</th>
+                      </tr>
+                    </thead>
+                    <tbody id="deptSummaryBody"></tbody>
+                  </table>
+                </div>
+              </div>
+                <div id="summaryGridResizer" class="summary-grid-resizer" title="拖动调整看板宽度" role="separator" aria-label="拖动调整看板宽度"></div>
+              <div class="summary-box">
+                <h3>延期任务 TOP 10</h3>
+                <ul id="delayTaskList" class="delay-list"></ul>
+              </div>
             </div>
           </div>
         </section>
@@ -76,19 +85,24 @@
 
         <div id="projectContent" class="hidden">
           <section class="block">
-            <div class="panel-title-row">
-              <h2>文本抽取</h2>
-              <button id="btnExtract">从文本提取</button>
-            </div>
-            <textarea id="textInput" rows="5" placeholder="粘贴项目描述，例如：任务名称、责任单位、责任部门、立项日期、目标验收日期、责任人等"></textarea>
-          </section>
-
-          <section class="block">
             <h2>项目基础信息</h2>
-            <div class="grid grid-3">
-              <label>项目编号<input id="projectCode" /></label>
+            <div class="task-name-row">
               <label>任务名称<input id="projectName" required /></label>
-              <label>工作措施<input id="projectMeasure" /></label>
+            </div>
+            <div class="grid grid-4">
+              <label>任务类别
+                <select id="taskCategory">
+                  <option value="类别A">类别A</option>
+                  <option value="类别B">类别B</option>
+                </select>
+              </label>
+              <label>主任务名称<input id="mainTaskName" /></label>
+              <label>系统类别
+                <select id="systemCategory">
+                  <option value="系统A">系统A</option>
+                  <option value="系统B">系统B</option>
+                </select>
+              </label>
               <label>责任单位<input id="ownerUnit" /></label>
               <label>责任部门<input id="ownerDept" /></label>
               <label>协办单位<input id="assistUnit" /></label>
@@ -96,6 +110,10 @@
               <label>立项日期<input id="startDate" type="date" /></label>
               <label>目标验收日期<input id="targetDate" type="date" /></label>
               <label>科信部责任人<input id="ownerPerson" /></label>
+            </div>
+            <div class="summary-row">
+              <span>整体计划百分比（自动）：</span>
+              <strong id="overallPlanProgress">0%</strong>
             </div>
             <div class="summary-row">
               <span>整体执行百分比（自动）：</span>
@@ -109,7 +127,7 @@
               <button id="btnAddTask">新增明细</button>
             </div>
             <div class="table-wrap">
-              <table>
+              <table class="task-table">
                 <thead>
                   <tr>
                     <th>序号</th>

@@ -112,7 +112,7 @@ class Handler(SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     init_db()
     host = os.environ.get("GANTT_HOST", "127.0.0.1")
-    requested_port = int(os.environ.get("GANTT_PORT", "8080"))
+    requested_port = int(os.environ.get("GANTT_PORT", "8081"))
     candidate_ports = [requested_port, 18080, 18081, 19090]
     # Keep order and remove duplicates.
     candidate_ports = list(dict.fromkeys(candidate_ports))

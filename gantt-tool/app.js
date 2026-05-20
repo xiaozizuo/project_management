@@ -1,19 +1,30 @@
 const STORAGE_KEY = "gantt_tool_data_v1";
 const API_BASE = "/api";
+const SIDEBAR_WIDTH_KEY = "gantt_sidebar_width";
+const SUMMARY_COLLAPSED_KEY = "gantt_summary_collapsed";
+const SUMMARY_SPLIT_KEY = "gantt_summary_split_left";
+const SIDEBAR_WIDTH_MIN = 220;
+const SIDEBAR_WIDTH_MAX = 680;
 
 const NODE_OPTIONS = ["计划", "立项", "采购", "实施", "上线试运行", "验收"];
 
 const dom = {
   projectList: document.getElementById("projectList"),
+  mainLayout: document.getElementById("mainLayout"),
+  sidebarResizer: document.getElementById("sidebarResizer"),
   emptyState: document.getElementById("emptyState"),
   projectContent: document.getElementById("projectContent"),
-  textInput: document.getElementById("textInput"),
-  btnExtract: document.getElementById("btnExtract"),
   btnNewProject: document.getElementById("btnNewProject"),
   btnAddTask: document.getElementById("btnAddTask"),
   btnExport: document.getElementById("btnExport"),
   fileImport: document.getElementById("fileImport"),
   backendStatus: document.getElementById("backendStatus"),
+  summaryBoard: document.getElementById("summaryBoard"),
+  summaryCompact: document.getElementById("summaryCompact"),
+  summaryDetails: document.getElementById("summaryDetails"),
+  btnSummaryToggle: document.getElementById("btnSummaryToggle"),
+  summaryGrid: document.getElementById("summaryGrid"),
+  summaryGridResizer: document.getElementById("summaryGridResizer"),
   summaryMonthFilter: document.getElementById("summaryMonthFilter"),
   summaryDeptFilter: document.getElementById("summaryDeptFilter"),
   summaryOwnerFilter: document.getElementById("summaryOwnerFilter"),
@@ -22,14 +33,16 @@ const dom = {
   deptSummaryBody: document.getElementById("deptSummaryBody"),
   delayTaskList: document.getElementById("delayTaskList"),
   taskTableBody: document.getElementById("taskTableBody"),
+  overallPlanProgress: document.getElementById("overallPlanProgress"),
   overallProgress: document.getElementById("overallProgress"),
   ganttContainer: document.getElementById("ganttContainer"),
   ganttScale: document.getElementById("ganttScale"),
   ganttMonthFilter: document.getElementById("ganttMonthFilter"),
   fields: {
-    projectCode: document.getElementById("projectCode"),
     projectName: document.getElementById("projectName"),
-    projectMeasure: document.getElementById("projectMeasure"),
+    taskCategory: document.getElementById("taskCategory"),
+    mainTaskName: document.getElementById("mainTaskName"),
+    systemCategory: document.getElementById("systemCategory"),
     ownerUnit: document.getElementById("ownerUnit"),
     ownerDept: document.getElementById("ownerDept"),
     assistUnit: document.getElementById("assistUnit"),
@@ -54,6 +67,7 @@ const runtime = {
   storageMode: "local",
   saveQueue: Promise.resolve(),
   storageNote: "",
+  summaryCollapsed: true,
 };
 
 function uid() {
@@ -96,7 +110,7 @@ async function loadFromApiIfAvailable() {
   try {
     if (window.location.protocol === "file:") {
       runtime.storageMode = "local";
-      runtime.storageNote = "请通过 http://127.0.0.1:8080 打开";
+      runtime.storageNote = "请通过 http://127.0.0.1:8081 打开";
       return;
     }
 
@@ -151,6 +165,63 @@ function persist() {
   queueApiPersist();
 }
 
+function clampSidebarWidth(width) {
+  return Math.max(SIDEBAR_WIDTH_MIN, Math.min(SIDEBAR_WIDTH_MAX, width));
+}
+
+function setSidebarWidth(width) {
+  if (!dom.mainLayout) return;
+  const clamped = clampSidebarWidth(width);
+  dom.mainLayout.style.setProperty("--sidebar-width", `${clamped}px`);
+  localStorage.setItem(SIDEBAR_WIDTH_KEY, String(clamped));
+}
+
+function initSidebarResize() {
+  if (!dom.mainLayout || !dom.sidebarResizer) return;
+
+  const saved = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+  if (Number.isFinite(saved) && saved > 0) {
+    setSidebarWidth(saved);
+  }
+
+  let dragging = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  const onMouseMove = (evt) => {
+    if (!dragging) return;
+    const delta = evt.clientX - startX;
+    setSidebarWidth(startWidth + delta);
+  };
+
+  const onMouseUp = () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.classList.remove("sidebar-resizing");
+    window.removeEventListener("mousemove", onMouseMove);
+    window.removeEventListener("mouseup", onMouseUp);
+    const p = getActiveProject();
+    if (p) renderGantt(p);
+  };
+
+  dom.sidebarResizer.addEventListener("mousedown", (evt) => {
+    if (window.innerWidth <= 1200) return;
+    dragging = true;
+    startX = evt.clientX;
+    const current = getComputedStyle(dom.mainLayout).getPropertyValue("--sidebar-width").trim();
+    startWidth = Number.parseInt(current || "320", 10) || 320;
+    document.body.classList.add("sidebar-resizing");
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  });
+
+  dom.sidebarResizer.addEventListener("dblclick", () => {
+    setSidebarWidth(320);
+    const p = getActiveProject();
+    if (p) renderGantt(p);
+  });
+}
+
 function getActiveProject() {
   return state.projects.find((p) => p.id === state.activeProjectId) || null;
 }
@@ -161,6 +232,9 @@ function createEmptyProject() {
     id,
     projectCode: `P-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${id.slice(-4).toUpperCase()}`,
     projectName: "",
+    taskCategory: "类别A",
+    mainTaskName: "",
+    systemCategory: "系统A",
     projectMeasure: "",
     ownerUnit: "",
     ownerDept: "",
@@ -206,6 +280,38 @@ function calcOverallProgress(tasks) {
     },
     { sum: 0, weight: 0 },
   );
+  return weighted.weight ? Math.round(weighted.sum / weighted.weight) : 0;
+}
+
+function calcOverallPlannedProgress(tasks) {
+  const validTasks = (tasks || []).filter((t) => t.expectedStartDate && t.expectedEndDate);
+  if (!validTasks.length) return 0;
+
+  const today = atStartOfDay(new Date());
+  const weighted = validTasks.reduce(
+    (acc, t) => {
+      const start = toDate(t.expectedStartDate);
+      const end = toDate(t.expectedEndDate);
+      if (!start || !end || end < start) return acc;
+
+      const totalDays = Math.max(1, Math.round((atStartOfDay(end) - atStartOfDay(start)) / 86400000) + 1);
+      let plannedPct = 0;
+      if (today < atStartOfDay(start)) {
+        plannedPct = 0;
+      } else if (today > atStartOfDay(end)) {
+        plannedPct = 100;
+      } else {
+        const elapsedDays = Math.max(1, Math.round((today - atStartOfDay(start)) / 86400000) + 1);
+        plannedPct = Math.round((elapsedDays / totalDays) * 100);
+      }
+
+      acc.sum += plannedPct * totalDays;
+      acc.weight += totalDays;
+      return acc;
+    },
+    { sum: 0, weight: 0 },
+  );
+
   return weighted.weight ? Math.round(weighted.sum / weighted.weight) : 0;
 }
 
@@ -339,6 +445,15 @@ function renderSummaryBoard() {
     ? Math.round(projects.reduce((sum, p) => sum + calcOverallProgress(p.tasks || []), 0) / projects.length)
     : 0;
 
+  dom.summaryCompact.innerHTML = [
+    `项目 ${projects.length}`,
+    `进行中 ${inProgressProjects}`,
+    `延期 ${delayedProjects}`,
+    `平均进度 ${avgProgress}%`,
+  ]
+    .map((x) => `<span class="summary-chip">${x}</span>`)
+    .join("");
+
   dom.summaryCards.innerHTML = [
     { label: "项目总数", value: projects.length },
     { label: "进行中项目", value: inProgressProjects },
@@ -390,6 +505,64 @@ function renderSummaryBoard() {
     : "<li>暂无延期任务</li>";
 }
 
+function setSummaryCollapsed(collapsed) {
+  runtime.summaryCollapsed = !!collapsed;
+  if (!dom.summaryBoard || !dom.btnSummaryToggle) return;
+  dom.summaryBoard.classList.toggle("collapsed", runtime.summaryCollapsed);
+  dom.btnSummaryToggle.textContent = runtime.summaryCollapsed ? "展开" : "收起";
+  localStorage.setItem(SUMMARY_COLLAPSED_KEY, runtime.summaryCollapsed ? "1" : "0");
+}
+
+function initSummaryBoardCollapse() {
+  const saved = localStorage.getItem(SUMMARY_COLLAPSED_KEY);
+  setSummaryCollapsed(saved === null ? true : saved === "1");
+}
+
+function setSummarySplitRatio(leftRatio) {
+  if (!dom.summaryGrid) return;
+  const left = Math.max(30, Math.min(70, Number(leftRatio) || 40));
+  const right = 100 - left;
+  dom.summaryGrid.style.setProperty("--summary-left", `${left}fr`);
+  dom.summaryGrid.style.setProperty("--summary-right", `${right}fr`);
+  localStorage.setItem(SUMMARY_SPLIT_KEY, String(left));
+}
+
+function initSummarySplitRatio() {
+  const saved = Number(localStorage.getItem(SUMMARY_SPLIT_KEY));
+  setSummarySplitRatio(Number.isFinite(saved) && saved > 0 ? saved : 40);
+}
+
+function initSummaryGridResize() {
+  if (!dom.summaryGrid || !dom.summaryGridResizer) return;
+
+  let dragging = false;
+
+  const onMouseMove = (evt) => {
+    if (!dragging) return;
+    const rect = dom.summaryGrid.getBoundingClientRect();
+    const x = evt.clientX - rect.left;
+    const total = Math.max(1, rect.width);
+    const leftRatio = (x / total) * 100;
+    setSummarySplitRatio(leftRatio);
+  };
+
+  const onMouseUp = () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.classList.remove("summary-grid-resizing");
+    window.removeEventListener("mousemove", onMouseMove);
+    window.removeEventListener("mouseup", onMouseUp);
+  };
+
+  dom.summaryGridResizer.addEventListener("mousedown", (evt) => {
+    dragging = true;
+    document.body.classList.add("summary-grid-resizing");
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    evt.preventDefault();
+  });
+}
+
 function renderProjectList() {
   dom.projectList.innerHTML = "";
 
@@ -423,7 +596,10 @@ function renderProjectList() {
 
 function bindProjectFields(project) {
   Object.entries(dom.fields).forEach(([key, input]) => {
-    input.value = project[key] || "";
+    const defaultValue = (key === "taskCategory" && input.options?.[0]?.value) ||
+      (key === "systemCategory" && input.options?.[0]?.value) ||
+      "";
+    input.value = project[key] || defaultValue;
     input.onchange = () => {
       project[key] = input.value.trim();
       project.updatedAt = new Date().toISOString();
@@ -549,7 +725,7 @@ function extractFromText(project, text) {
   const pick = (current, next) => (current ? current : next || "");
 
   project.projectName = pick(project.projectName, parseSimpleField(text, ["任务名称", "项目名称"]));
-  project.projectMeasure = pick(project.projectMeasure, parseSimpleField(text, ["工作措施", "工作内容"]));
+  project.mainTaskName = pick(project.mainTaskName, parseSimpleField(text, ["主任务名称"]));
   project.ownerUnit = pick(project.ownerUnit, parseSimpleField(text, ["责任单位"]));
   project.ownerDept = pick(project.ownerDept, parseSimpleField(text, ["责任部门"]));
   project.assistUnit = pick(project.assistUnit, parseSimpleField(text, ["协办单位"]));
@@ -588,6 +764,8 @@ function renderGantt(project) {
   const rowH = 34;
   const leftCol = 250;
   const h = tasks.length * rowH + 60;
+  const containerWidth = Math.max(360, (dom.ganttContainer?.clientWidth || 0) - 2);
+  const timelineWidth = Math.max(120, containerWidth - leftCol - 30);
   let svg = "";
 
   if (scale === "year") {
@@ -597,9 +775,14 @@ function renderGantt(project) {
     const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
     const totalMonths = monthIndexBetween(startMonth, endMonth) + 1;
     const totalDays = Math.max(1, Math.ceil((end - start) / 86400000) + 1);
-    const monthUnitW = 36;
-    const dayUnitW = (totalMonths * monthUnitW) / totalDays;
-    const width = Math.max(900, Math.ceil(totalDays * dayUnitW) + leftCol + 40);
+    const dayUnitW = timelineWidth / totalDays;
+    const width = Math.ceil(leftCol + timelineWidth + 24);
+    const monthPx = timelineWidth / totalMonths;
+    const monthLineStep = monthPx < 6 ? 3 : 1;
+    const showQuarterLabel = monthPx >= 14;
+    const showHalfYearLabel = monthPx >= 8;
+    const minLabelGap = 52;
+    let lastLabelX = -Infinity;
 
     svg = `<svg class="gantt-svg" width="${width}" height="${h}" xmlns="http://www.w3.org/2000/svg">`;
     svg += `<rect x="0" y="0" width="${width}" height="${h}" fill="#fbfdff"/>`;
@@ -608,12 +791,26 @@ function renderGantt(project) {
       const dt = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1);
       const x = leftCol + Math.round((atStartOfDay(dt) - start) / 86400000) * dayUnitW;
       const isYearBoundary = dt.getMonth() === 0;
-      svg += `<line x1="${x}" y1="30" x2="${x}" y2="${h}" stroke="${isYearBoundary ? "#8aa5c7" : "#edf1f7"}" stroke-width="${isYearBoundary ? 2 : 1}" />`;
+      const isMajorMonthTick = i % monthLineStep === 0;
+      if (isYearBoundary || isMajorMonthTick) {
+        svg += `<line x1="${x}" y1="30" x2="${x}" y2="${h}" stroke="${isYearBoundary ? "#8aa5c7" : "#edf1f7"}" stroke-width="${isYearBoundary ? 2 : 1}" />`;
+      }
 
       if (isYearBoundary) {
-        svg += `<text x="${x + 2}" y="16">${dt.getFullYear()}年</text>`;
-      } else if (dt.getMonth() % 3 === 0) {
-        svg += `<text x="${x + 2}" y="16">${String(dt.getMonth() + 1).padStart(2, "0")}月</text>`;
+        if (x - lastLabelX >= minLabelGap) {
+          svg += `<text x="${x + 2}" y="16">${dt.getFullYear()}年</text>`;
+          lastLabelX = x;
+        }
+      } else if (showQuarterLabel && dt.getMonth() % 3 === 0) {
+        if (x - lastLabelX >= minLabelGap) {
+          svg += `<text x="${x + 2}" y="16">${String(dt.getMonth() + 1).padStart(2, "0")}月</text>`;
+          lastLabelX = x;
+        }
+      } else if (!showQuarterLabel && showHalfYearLabel && dt.getMonth() % 6 === 0) {
+        if (x - lastLabelX >= minLabelGap) {
+          svg += `<text x="${x + 2}" y="16">${String(dt.getMonth() + 1).padStart(2, "0")}月</text>`;
+          lastLabelX = x;
+        }
       }
     }
 
@@ -647,8 +844,13 @@ function renderGantt(project) {
   const start = atStartOfDay(rawStart);
   const end = atStartOfDay(rawEnd);
   const totalDays = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1);
-  const unitW = 22;
-  const width = Math.max(900, totalDays * unitW + 280);
+  const unitW = timelineWidth / totalDays;
+  const width = Math.ceil(leftCol + timelineWidth + 24);
+  const lineStep = Math.max(1, Math.ceil(4 / Math.max(unitW, 0.1)));
+  const labelStep = Math.max(1, Math.ceil(46 / Math.max(unitW, 0.1)));
+  const minLabelGap = Math.max(46, Math.ceil(8 / Math.max(unitW, 0.1)) * unitW);
+  const showDayLabel = unitW >= 12;
+  let lastLabelX = -Infinity;
 
   svg = `<svg class="gantt-svg" width="${width}" height="${h}" xmlns="http://www.w3.org/2000/svg">`;
   svg += `<rect x="0" y="0" width="${width}" height="${h}" fill="#fbfdff"/>`;
@@ -657,11 +859,27 @@ function renderGantt(project) {
     const dt = new Date(start.getTime() + i * 86400000);
     const x = leftCol + i * unitW;
     const isYearBoundary = dt.getMonth() === 0 && dt.getDate() === 1;
-    svg += `<line x1="${x}" y1="30" x2="${x}" y2="${h}" stroke="${isYearBoundary ? "#8aa5c7" : "#edf1f7"}" stroke-width="${isYearBoundary ? 2 : 1}" />`;
+    const isMonthBoundary = dt.getDate() === 1;
+    const isMajorDayTick = i % lineStep === 0;
+    if (isYearBoundary || isMonthBoundary || isMajorDayTick) {
+      svg += `<line x1="${x}" y1="30" x2="${x}" y2="${h}" stroke="${isYearBoundary ? "#8aa5c7" : "#edf1f7"}" stroke-width="${isYearBoundary ? 2 : 1}" />`;
+    }
+
     if (isYearBoundary) {
-      svg += `<text x="${x + 2}" y="16">${dt.getFullYear()}年</text>`;
-    } else if (i % 5 === 0) {
-      svg += `<text x="${x + 2}" y="16">${dateToInput(dt).slice(5)}</text>`;
+      if (x - lastLabelX >= minLabelGap) {
+        svg += `<text x="${x + 2}" y="16">${dt.getFullYear()}年</text>`;
+        lastLabelX = x;
+      }
+    } else if (isMonthBoundary) {
+      if (x - lastLabelX >= minLabelGap) {
+        svg += `<text x="${x + 2}" y="16">${String(dt.getMonth() + 1).padStart(2, "0")}月</text>`;
+        lastLabelX = x;
+      }
+    } else if (showDayLabel && labelStep <= 16 && i % labelStep === 0) {
+      if (x - lastLabelX >= minLabelGap) {
+        svg += `<text x="${x + 2}" y="16">${dateToInput(dt).slice(5)}</text>`;
+        lastLabelX = x;
+      }
     }
   }
 
@@ -704,6 +922,8 @@ function renderActiveProject() {
 
   bindProjectFields(project);
   renderTaskTable(project);
+  const overallPlan = calcOverallPlannedProgress(project.tasks);
+  dom.overallPlanProgress.textContent = `${overallPlan}%`;
   const overall = calcOverallProgress(project.tasks);
   dom.overallProgress.textContent = `${overall}%`;
   renderGantt(project);
@@ -776,6 +996,54 @@ function importData(file) {
   reader.readAsText(file, "utf-8");
 }
 
+function importTextAndExtract(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const text = String(reader.result || "").trim();
+      if (!text) {
+        alert("导入失败：文本内容为空");
+        return;
+      }
+
+      if (!getActiveProject()) {
+        addProject();
+      }
+      const project = getActiveProject();
+      if (!project) {
+        alert("导入失败：无法创建项目");
+        return;
+      }
+
+      extractFromText(project, text);
+      upsertSnapshot(project);
+      persist();
+      renderAll();
+      alert("文本导入并提取成功");
+    } catch (err) {
+      console.error(err);
+      alert("导入失败：文本解析异常");
+    }
+  };
+  reader.readAsText(file, "utf-8");
+}
+
+function handleImportFile(file) {
+  const lowerName = String(file?.name || "").toLowerCase();
+  const isJson = lowerName.endsWith(".json") || String(file?.type || "").includes("json");
+  const isText = lowerName.endsWith(".txt") || String(file?.type || "").startsWith("text/");
+
+  if (isJson) {
+    importData(file);
+    return;
+  }
+  if (isText) {
+    importTextAndExtract(file);
+    return;
+  }
+  alert("仅支持导入 .json 或 .txt 文件");
+}
+
 function bindEvents() {
   dom.btnNewProject.addEventListener("click", addProject);
   dom.btnAddTask.addEventListener("click", () => {
@@ -784,25 +1052,11 @@ function bindEvents() {
     addTask(p);
   });
 
-  dom.btnExtract.addEventListener("click", () => {
-    const p = getActiveProject();
-    if (!p) return;
-    const text = dom.textInput.value.trim();
-    if (!text) {
-      alert("请先粘贴文本");
-      return;
-    }
-    extractFromText(p, text);
-    upsertSnapshot(p);
-    persist();
-    renderAll();
-  });
-
   dom.btnExport.addEventListener("click", exportData);
 
   dom.fileImport.addEventListener("change", (evt) => {
     const file = evt.target.files?.[0];
-    if (file) importData(file);
+    if (file) handleImportFile(file);
     evt.target.value = "";
   });
 
@@ -840,9 +1094,28 @@ function bindEvents() {
     state.summaryFilters.owner = "";
     renderAll();
   });
+
+  dom.btnSummaryToggle.addEventListener("click", () => {
+    setSummaryCollapsed(!runtime.summaryCollapsed);
+  });
+
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    if (resizeTimer) {
+      clearTimeout(resizeTimer);
+    }
+    resizeTimer = setTimeout(() => {
+      const p = getActiveProject();
+      if (p) renderGantt(p);
+    }, 120);
+  });
 }
 
 async function initApp() {
+  initSidebarResize();
+  initSummaryBoardCollapse();
+  initSummarySplitRatio();
+  initSummaryGridResize();
   loadFromLocal();
   await loadFromApiIfAvailable();
   bindEvents();
